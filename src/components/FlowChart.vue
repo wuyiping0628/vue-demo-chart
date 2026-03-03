@@ -24,11 +24,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, reactive, watch } from "vue";
 import { TinyModal, TinyFlowchart } from "@opentiny/vue";
 import { hooks, props } from "@opentiny/vue-common";
 
-const { createConfig } = TinyFlowchart;
+const { createNode, createLink, createConfig } = TinyFlowchart
 
 // template refs
 const chart = ref(null);
@@ -44,7 +44,6 @@ onMounted(() => {
 
   const applySize = () => {
     const w = parent.offsetWidth * 0.95 || 0;
-    console.log(111, w);
 
     // ensure chart cols accommodate max col in data
     const maxCol = Math.max(
@@ -84,7 +83,7 @@ const propsData = defineProps({
   },
 });
 
-const chartData = propsData.chartData || {};
+const chartData = reactive({ nodes: [], links: [] });
 
 const chartConfig = createConfig();
 
@@ -109,6 +108,50 @@ function onClickLink(_afterLink, _e) {
 function onClickBlank(_param, _e) {
   TinyModal.message("click-blank");
 }
+
+function getData(newData) {
+  if (!newData) {
+    chartData.nodes = [];
+    chartData.links = [];
+    return { nodes: chartData.nodes, links: chartData.links };
+  }
+
+  const convert = (raw, creator) => {
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+
+    if (Array.isArray(raw[0]) && !Array.isArray(raw[0][0])) {
+      return raw.map((params) => creator(...params));
+    }
+
+    if (Array.isArray(raw[0]) && Array.isArray(raw[0][0])) {
+      return raw.flat().map((params) => creator(...params));
+    }
+
+    return raw.map((params) => creator(...params));
+  };
+
+  const nodes = convert(newData.nodes || [], createNode);
+  const links = convert(newData.links || [], createLink);
+
+  chartData.nodes = nodes;
+  chartData.links = links;
+
+  return { nodes, links };
+}
+
+watch(
+  () => propsData.chartData,
+  (newData) => {
+    if (newData && newData.nodes && newData.links) {
+      getData(newData);
+    } else {
+      // clear if empty
+      chartData.nodes = [];
+      chartData.links = [];
+    }
+  },
+  { deep: true, immediate: true }
+);
 </script>
 
 <style scoped>
